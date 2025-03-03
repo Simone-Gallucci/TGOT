@@ -1,0 +1,221 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminale Simulato</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background-color: black;
+            color: black;
+            font-family: monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+        #title {
+            font-size: 24px;
+            font-weight: bold;
+            color: black;
+            text-align: center;
+            margin-top: 10px;
+        }
+        #terminal {
+            width: 90%;
+            height: 80%;
+            display: flex;
+            flex-direction: column;
+            background-color: black;
+            padding: 10px;
+            overflow: hidden;
+            border: 2px solid lime;
+            margin-top: 10px;
+        }
+        #output-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+        #input-line {
+            display: flex;
+            align-items: center;
+            padding: 5px;
+            background-color: black;
+            position: sticky;
+            bottom: 0;
+            width: 100%;
+        }
+        #prompt {
+            color: black;
+            flex-shrink: 0;
+            margin-right: 5px;
+        }
+        #cmd {
+            background: transparent;
+            border: none;
+            color: black;
+            font-family: monospace;
+            font-size: 16px;
+            flex-grow: 1;
+            outline: none;
+            min-width: 50px;
+            text-transform: lowercase;
+        }
+        a {
+            color: black;
+            text-decoration: none;
+            margin-right: 10px;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div id="title">The Ghost One</div>
+
+    <div id="terminal">
+        <div id="output-container">
+            <div id="output"></div>
+        </div>
+        <div id="input-line">
+            <span id="prompt">TGO@terminal:/</span>
+            <input type="text" id="cmd" autofocus autocomplete="off">
+        </div>
+    </div>
+
+    <script>
+        function loadFileSystem() {
+            let savedData = localStorage.getItem("fileSystem");
+            return savedData ? JSON.parse(savedData) : {};
+        }
+
+        function saveFileSystem() {
+            localStorage.setItem("fileSystem", JSON.stringify(fileSystem));
+        }
+
+        let fileSystem = loadFileSystem();
+        let currentPath = ["/"];
+
+        function getCurrentFolder() {
+            let folder = fileSystem;
+            for (let i = 1; i < currentPath.length; i++) {
+                folder = folder[currentPath[i]];
+            }
+            return folder;
+        }
+
+        function updatePrompt() {
+            //document.getElementById("prompt").innerText = `TGO@terminal:${currentPath.join("/")}$`;
+        }
+
+        const inputField = document.getElementById("cmd");
+        const outputDiv = document.getElementById("output");
+        const outputContainer = document.getElementById("output-container");
+
+        inputField.addEventListener("keydown", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                let input = this.value.trim().toLowerCase();
+                this.value = "";
+                executeCommand(input);
+            }
+        });
+
+        function executeCommand(input) {
+            let commandLine = `<p><span style="color: lime;">TGO@terminal:${currentPath.join("/")}$</span> ${input}</p>`;
+            let response = "";
+            let args = input.split(" ");
+
+            switch (args[0]) {
+                case "help":
+                    response = `<p>Comandi disponibili:<br>
+                                - help: Mostra questo messaggio<br>
+                                - clear: Pulisce lo schermo<br>
+                                - ls: Mostra file e cartelle<br>
+                                - mkdir [cartella]: Crea una cartella<br>
+                                - cd [cartella]: Entra in una cartella<br>
+                                - cd ..: Torna indietro<br>
+                                - touch [file.txt]: Crea un file di testo<br>
+                                - nano [file.txt]: Modifica un file di testo<br>
+                                - rm [file/cartella]: Elimina file o cartella<br>
+                                - echo [testo]: Stampa il testo</p>`;
+                    break;
+
+                case "clear":
+                    outputDiv.innerHTML = "";
+                    return;
+
+                case "ls":
+                    let currentFolder = getCurrentFolder();
+                    let filesAndFolders = Object.keys(currentFolder)
+                        .map(item => (typeof currentFolder[item] === "string" ? 
+                            `<a href="#">${item}</a>` : 
+                            `<span style="color: cyan;">${item}/</span>`))
+                        .join(" ");
+                    response = `<p>${filesAndFolders}</p>`;
+                    break;
+
+                case "mkdir":
+                    if (args.length < 2) {
+                        response = "<p>Errore: Specifica un nome per la cartella.</p>";
+                    } else {
+                        let folderName = args[1].trim();
+                        let folder = getCurrentFolder();
+                        if (!folder[folderName]) {
+                            folder[folderName] = {};
+                            saveFileSystem();
+                            response = `<p>Cartella '${folderName}' creata con successo.</p>`;
+                        } else {
+                            response = `<p>Errore: La cartella '${folderName}' esiste già.</p>`;
+                        }
+                    }
+                    break;
+
+                case "rm":
+                    if (args.length < 2) {
+                        response = "<p>Errore: Specifica il nome di un file o cartella da eliminare.</p>";
+                    } else {
+                        let itemName = args[1].trim();
+                        let folder = getCurrentFolder();
+                        if (folder[itemName] !== undefined) {
+                            delete folder[itemName];
+                            saveFileSystem();
+                            response = `<p>'${itemName}' eliminato con successo.</p>`;
+                        } else {
+                            response = `<p>Errore: '${itemName}' non esiste.</p>`;
+                        }
+                    }
+                    break;
+
+                case "echo":
+                    response = `<p>${input.substring(5)}</p>`;
+                    break;
+
+                default:
+                    response = `<p>Comando non riconosciuto: ${input}</p>`;
+            }
+
+            outputDiv.innerHTML += commandLine + response + "<hr>";
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            requestAnimationFrame(() => {
+                outputContainer.scrollTo({ top: outputContainer.scrollHeight, behavior: "smooth" });
+            });
+        }
+    </script>
+</body>
+</html>
